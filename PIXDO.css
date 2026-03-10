@@ -1,0 +1,314 @@
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #111; color: #eee;
+    font-family: sans-serif; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 0; gap: 1.5rem;
+  }
+
+  /* ページ全体をドロップ対象にするオーバーレイ */
+  #globalDrop {
+    display: none;
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(255,255,255,0.07);
+    border: 4px dashed #fff;
+    align-items: center; justify-content: center;
+    font-size: 1.5rem; color: #fff; pointer-events: none;
+  }
+  #globalDrop.show { display: flex; }
+
+  h1 { font-size: 2rem; color: #fff; font-weight: 900; letter-spacing: 8px; text-indent: 8px; }
+
+  #fileInput { display: none; }
+  #fileName { font-size: 0.75rem; color: #666; letter-spacing: 0.5px; word-break: break-all; }
+
+  #uploadArea {
+    display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
+    position: fixed; inset: 0; justify-content: center;
+    padding-bottom: 8vh; z-index: 10;
+  }
+  #uploadArea.hidden { display: none; }
+
+  #dropZone {
+    position: fixed; inset: 16px;
+    border: 2px dashed #333; border-radius: 16px;
+    background: transparent; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    pointer-events: all;
+  }
+  #dropZone:hover { border-color: #666; background: rgba(255,255,255,0.02); }
+  #dropZone .sub { display: none; }
+  #dropZone .label {
+    display: none; /* テキストはuploadArea内に独立して置く */
+  }
+
+  #dropZoneSmall {
+    padding: 0.5rem 0.8rem;
+    border: 1px dashed #444; border-radius: 6px;
+    background: #1a1a1a; color: #777;
+    font-size: 0.8rem; cursor: pointer; text-align: center;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  #dropZoneSmall:hover { border-color: #aaa; color: #ccc; }
+
+  #mainLayout { display: none; }
+  #mainLayout.visible {
+    display: flex; flex-direction: row; align-items: flex-start;
+    gap: 1.5rem; width: 100%; justify-content: center;
+    padding: 0 1rem;
+  }
+  #mainLayout.visible.genzon {
+    justify-content: flex-start;
+  }
+  #mainLayout.visible.genzon #canvasArea {
+    flex: 1 1 auto;
+  }
+
+  #sidePanel {
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 1.3rem; min-width: 190px; width: 210px; flex-shrink: 0;
+    padding-top: 0.5rem;
+  }
+
+  #sizeRow {
+    display: flex; flex-direction: column; gap: 0.4rem;
+    font-size: 0.82rem; color: #aaa;
+  }
+  #sizeRow select {
+    background: #222; color: #eee; border: 1px solid #444;
+    padding: 0.3rem 0.5rem; border-radius: 4px; font-size: 0.82rem;
+    cursor: pointer; width: 100%;
+  }
+
+  #sidePanel #demoBtn { width: 100%; padding: 0.85rem 1rem; }
+  #sidePanel #previewBtn, #sidePanel #midResetBtn { width: 100%; }
+
+  /* キャンバス層 */
+  #canvasArea { position: relative; display: none; max-width: 100%; overflow: auto; }
+  #animCanvas {
+    position: fixed !important;
+    top: 0; left: 0;
+    width: 100vw !important; height: 100vh !important;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  #baseCanvas, #revealCanvas, #ghostCanvas {
+    display: block;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+  }
+  #revealCanvas, #gridCanvas, #ghostCanvas {
+    position: absolute; top: 0; left: 0; pointer-events: none;
+  }
+  #revealCanvas { pointer-events: auto; cursor: pointer; }
+  /* gridCanvasは実px解像度 */
+  #gridCanvas { display: block; image-rendering: auto; }
+
+  #ghostCanvas { opacity: 0; transition: opacity 0.2s; }
+  #ghostCanvas.visible { opacity: 0.55; }
+
+  #counter { display: none; font-size: 0.8rem; color: #888; letter-spacing: 1px; }
+
+  .side-page {
+    display: flex; flex-direction: column; gap: 1.3rem;
+  }
+
+  #btnRow {
+    display: flex; flex-direction: column; gap: 0.75rem;
+    padding-top: 1rem; border-top: 1px solid #222;
+    margin-top: 0.3rem;
+  }
+
+  #demoBtn {
+    padding: 0.85rem 2.5rem; background: #4caf50; color: #fff;
+    border: none; font-size: 1rem; font-weight: bold;
+    cursor: pointer; border-radius: 4px; transition: background 0.1s, transform 0.1s;
+  }
+  #demoBtn:hover:not(:disabled) { background: #66bb6a; transform: translateY(-1px); }
+  #demoBtn:active:not(:disabled) { transform: translateY(1px); }
+  #demoBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  #demoBtn.holding { animation: holdPulse 0.18s ease-in-out infinite alternate; }
+  @keyframes holdPulse {
+    from { transform: scale(1);    box-shadow: 0 0  6px rgba(76,175,80,0.4); }
+    to   { transform: scale(1.04); box-shadow: 0 0 18px rgba(76,175,80,0.9); }
+  }
+
+  #previewBtn {
+    padding: 0.85rem 1.6rem; background: transparent; color: #aaa;
+    border: 1px solid #555; font-size: 0.9rem; cursor: pointer; border-radius: 4px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  #previewBtn:hover { border-color: #aaa; color: #fff; }
+  #previewBtn.active { background: rgba(255,255,255,0.1); border-color: #fff; color: #fff; }
+
+  #midResetBtn {
+    padding: 0.85rem 1.2rem;
+    background: transparent; color: #555;
+    border: 1px solid #333; font-size: 0.9rem;
+    cursor: pointer; border-radius: 4px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  #midResetBtn:hover { border-color: #e05; color: #e05; }
+
+  /* モード切替 */
+  .mode-btn {
+    padding: 0.35rem 0.6rem;
+    background: #1e1e1e; color: #666;
+    border: 1px solid #333; font-size: 0.8rem;
+    cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .mode-btn:first-child { border-radius: 4px 0 0 4px; }
+  .mode-btn:last-child  { border-radius: 0 4px 4px 0; border-left: none; }
+  .mode-btn.active { background: #333; color: #fff; border-color: #555; }
+  .mode-btn:hover:not(.active):not(:disabled) { background: #2a2a2a; color: #aaa; }
+  .mode-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* 塗り順モード */
+  #paintModeRow { display: flex; gap: 0; align-items: center; }
+
+  #timeSubRow { display: none; flex-direction: column; gap: 0; width: 100%; }
+  #timeSubRow .mode-btn { border-radius: 0 !important; border-left: 1px solid #333 !important; width: 100%; text-align: center; }
+  #timeSubRow .mode-btn:first-child { border-radius: 4px 4px 0 0 !important; }
+  #timeSubRow .mode-btn:last-child  { border-radius: 0 0 4px 4px !important; border-top: none !important; }
+
+  #timerQuickBtns { display: flex; gap: 0.4rem; flex-wrap: nowrap; }
+
+  #timePanel .tval, #timerPanel .tval {
+    display: block; color: #fff; font-weight: bold; font-size: 0.85rem;
+    white-space: nowrap; margin-top: 0.1rem;
+  }
+
+  /* 時間設定パネル */
+  #timePanel {
+    display: none; flex-direction: column; align-items: flex-start; gap: 0.6rem;
+    font-size: 0.85rem; color: #aaa; width: 100%;
+  }
+  #timePanel .trow { display: flex; align-items: center; gap: 0.6rem; white-space: nowrap; flex-wrap: nowrap; }
+  #timePanel input[type=range] { width: 90px; accent-color: #e8c84a; }
+  #timerPanel input[type=range] { width: 90px; accent-color: #e8c84a; }
+  #timePanel .tval {
+    color: #fff; font-weight: bold; min-width: 80px; white-space: nowrap;
+  }
+  #dotsPerSecVal, #timerDotsVal {
+    display: inline-block;
+    cursor: text;
+    border-bottom: 1px dashed #666;
+    padding: 0 2px;
+    min-width: 1em;
+    outline: none;
+  }
+  #dotsPerSecVal:focus, #timerDotsVal:focus {
+    border-bottom-color: #e8c84a;
+    color: #e8c84a;
+  }
+  #timerDisplay {
+    display: none; font-size: 1.1rem; color: #e8c84a;
+    letter-spacing: 2px; font-variant-numeric: tabular-nums;
+  }
+  #timerPanel {
+    display: none; flex-direction: column; align-items: flex-start; gap: 0.6rem;
+    font-size: 0.85rem; color: #aaa; width: 100%;
+  }
+  #timerPanel .trow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: nowrap; justify-content: center; white-space: nowrap; }
+
+  .quick-btn {
+    padding: 0.25rem 0.5rem; background: #222; color: #888;
+    border: 1px solid #444; border-radius: 4px; font-size: 0.75rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .quick-btn:hover { background: #333; color: #fff; border-color: #666; }
+
+  @keyframes timerFlash {
+    0%, 100% { color: #e05050; }
+    50%       { color: transparent; }
+  }
+  .flash-error { animation: timerFlash 0.35s ease-in-out 4; }
+
+  /* 完成モーダル */
+  #completeModal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92); z-index: 100;
+    overflow: hidden;
+  }
+  #completeModal.show { display: block; }
+  #completeModal h2 {
+    position: absolute; top: 1.2rem; left: 50%; transform: translateX(-50%);
+    font-size: 1.8rem; color: #e8c84a; white-space: nowrap;
+  }
+
+  /* completeCanvas: JS側でstyle.width/heightを計算して設定 */
+  #completeCanvas {
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    border: none;
+    display: block; cursor: grab;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform-origin: center center;
+  }
+
+  #resetBtn {
+    flex-shrink: 0;
+    padding: 0.6rem 2rem; background: transparent;
+    border: 2px solid #aaa; color: #aaa;
+    font-size: 0.85rem; cursor: pointer; border-radius: 4px;
+  }
+  #resetBtn:hover { border-color: #fff; color: #fff; }
+
+  /* ── サイドタブ ── */
+  #sideTabs {
+    display: flex; gap: 0; margin-bottom: 1rem;
+    border-bottom: 2px solid #333;
+  }
+  .side-tab {
+    flex: 1; padding: 0.5rem 0.2rem;
+    background: transparent; border: none;
+    color: #888; font-size: 0.85rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .side-tab.active { color: #eee; border-bottom-color: #e8c84a; }
+  .side-tab:hover:not(.active) { color: #ccc; }
+
+  /* ── アニメーションページ ── */
+  .anim-section {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    padding: 0.8rem 0; border-bottom: 1px solid #222;
+  }
+  .anim-section:last-child { border-bottom: none; }
+  .anim-label { font-size: 0.8rem; color: #888; }
+  .anim-toggle-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.95rem; cursor: pointer;
+  }
+  .anim-toggle-row input[type="checkbox"] {
+    width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: #e8c84a;
+  }
+  #animFreqBtns, #animDirBtns {
+    display: flex; gap: 0.4rem;
+  }
+  .anim-freq-btn, .anim-dir-btn {
+    flex: 1; padding: 0.4rem 0.3rem;
+    background: transparent; border: 1px solid #444;
+    color: #888; font-size: 0.85rem; cursor: pointer; border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .anim-freq-btn.active, .anim-dir-btn.active {
+    border-color: #e8c84a; color: #e8c84a; background: rgba(232,200,74,0.08);
+  }
+  #animSpeed { width: 100%; accent-color: #e8c84a; }
+  .anim-speed-label { font-size: 0.8rem; color: #888; text-align: right; }
+
+  #rareNotice {
+    color: #e8c84a;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    animation: rareFadeIn 0.4s ease;
+  }
+  @keyframes rareFadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
