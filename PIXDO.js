@@ -46,8 +46,22 @@ let revealed = 0;
 let isComplete = false;
 const animMargin = 120;
 
-// レア演出確率 (本番: 1/20000000、開発中: 1/10)
-const RARE_DIAG_PROB = 1/10;
+// ── 永続化用 ──
+let currentImageDataURL = null;        // 読み込んだ画像のdataURL（保存用）
+let paintSeed = 0;                      // ランダム塗り順を再現するためのシード
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function() {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// レア演出（斜め射出＋星パーティクル）。v1ではOFF。v2でtrueにするだけで復活する。コードは消さず保持。
+const ENABLE_RARE_DIAG = false;        // ← v2でtrueにすれば復活
+const RARE_DIAG_PROB   = 1/1000000;    // 本番確率（100万分の1）。ONのとき適用
 
 // アニメーション設定
 let animEnabled = true;
@@ -101,6 +115,7 @@ function startCountdown() {
       countdownInterval = null;
       const dots = Math.max(1, timerDots || 1);
       paintDots(dots);
+      saveProgress();
       try {
         const ctx = new AudioContext();
         const osc = ctx.createOscillator();
@@ -164,40 +179,44 @@ document.querySelectorAll('.quick-btn').forEach(btn => {
 );
 }
 );
-const STORAGE_KEY = 'pixdo_timer_state';
-function saveTimerState() {
-  const state = {
-    revealed,
-    accumulatedSec,
-    paintOrder,
-    dotCols, dotRows, dotPx,
-    totalPixels,
+// ── 永続化（画像と進捗を別キーで保存）──
+const IMG_KEY  = 'pixdo_image';
+const PROG_KEY = 'pixdo_progress';
+function saveImage() {
+  try {
+    localStorage.setItem(IMG_KEY, JSON.stringify({ dataURL: currentImageDataURL, fileName: fileName.textContent }));
+  }
+  catch(e) { /* 画像が大きすぎてquota超過した場合は保存しない */ }
+}
+function saveProgress() {
+  if (!uploadedImage) return;
+  const prog = {
+    dotSizeValue: dotSizeSelect.value,
     randomMode,
-    sessionStartMs: timerRunning ? Date.now() : null
+    paintSeed,
+    inputMode: isTimeMode ? 'stopwatch' : (isTimerMode ? 'countdown' : 'task'),
+    revealed,
+    accumulatedSec: accumulatedSec + (timerRunning ? Math.floor((Date.now() - sessionStartMs) / 1000) : 0),
+    dotsPerSec,
+    timerDots,
+    countdownTotal
   };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(PROG_KEY, JSON.stringify(prog));
   }
   catch(e) {
   }
 }
-function loadTimerState() {
+function clearProgress() {
   try {
-    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (!s) return null;
-    return s;
-  }
-  catch(e) {
-    return null;
-  }
-}
-function clearTimerState() {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PROG_KEY);
   }
   catch(e) {
   }
 }
+// 旧名エイリアス（既存の呼び出しをそのまま動かす）
+const saveTimerState  = saveProgress;
+const clearTimerState = clearProgress;
 function formatTime(sec) {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
@@ -431,11 +450,13 @@ function loadFile(f) {
     const img = new Image();
     img.onload = () => {
       uploadedImage = img;
+      currentImageDataURL = ev.target.result;
       fileName.textContent = '📎 ' + f.name;
       document.getElementById('uploadArea').classList.add('hidden');
       document.getElementById('mainTitle').style.display = 'block';
       document.getElementById('mainLayout').classList.add('visible');
       convert();
+      saveImage();
     };
     img.src = ev.target.result;
   };
@@ -471,7 +492,7 @@ dotSizeSelect.addEventListener('change', () => {
 }
 );
 // ── 変換 ──
-function convert() {
+function convert(isRestore = false) {
   const rawDotPx = parseInt(dotSizeSelect.value);
   dotPx = rawDotPx;
   const mainLayout = document.getElementById('mainLayout');
@@ -506,17 +527,19 @@ function convert() {
   isComplete = false;
   previewOn = false;
   // 塗り順を構築
+  if (!isRestore) paintSeed = (Math.random() * 4294967296) >>> 0;
+  const rng = mulberry32(paintSeed);
   paintOrder = Array.from({
     length: cols * rows
   }
   , (_, i) => i);
   if (randomMode) {
-    // まず全体をシャッフル
+    // まず全体をシャッフル（シード付き乱数で再現可能に）
     const arr = paintOrder.slice();
     for (let i = arr.length - 1;
     i > 0;
     i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rng() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     // stride飛ばしで並べ直す → 画面全体が均等に同時進行する
@@ -608,7 +631,7 @@ pauseTimer();
 accumulatedSec = 0;
 dotFraction = 0;
 timerText.textContent = '00:00:00';
-clearTimerState();
+if (!isRestore) saveProgress();
 canvasArea.style.display = 'inline-block';
 counter.style.display = 'block';
 modeRow.style.display = 'flex';
@@ -732,6 +755,7 @@ demoBtn.addEventListener('click', () => {
   }
   if (holdTick > 0) return;
   paintDots(1);
+  saveProgress();
 }
 );
 demoBtn.addEventListener('pointerdown', (e) => {
@@ -746,7 +770,7 @@ demoBtn.addEventListener('pointerdown', (e) => {
 }
 );
 demoBtn.addEventListener('pointerup',    () => {
-  if (!isTimeMode && !isTimerMode) stopHold();
+  if (!isTimeMode && !isTimerMode) { stopHold(); saveProgress(); }
 }
 );
 demoBtn.addEventListener('pointerleave', () => {
@@ -825,6 +849,7 @@ midResetBtn.addEventListener('click', () => {
   demoBtn.classList.remove('holding');
   demoBtn.textContent = isTimeMode ? '▶ 開始' : isTimerMode ? '▶ スタート' : '▶ タスクを完了する';
   updateCounter();
+  saveProgress();
 }
 );
 // completeModal全体クリックで閉じる
@@ -936,8 +961,8 @@ function spawnAnim(col, row, color) {
   let startX = cx, startY = cy;
   let isRare = false;
   let rareDiag = '';
-  // 超レア：斜め射出
-  if (Math.random() < RARE_DIAG_PROB) {
+  // 超レア：斜め射出（v1はENABLE_RARE_DIAG=falseでOFF）
+  if (ENABLE_RARE_DIAG && Math.random() < RARE_DIAG_PROB) {
     isRare = true;
     rareDiag = ['upleft','upright','downleft','downright'][Math.floor(Math.random()*4)];
     if (rareDiag === 'upleft')    { startX = -r*2; startY = -r*2; }
@@ -1118,3 +1143,70 @@ animSpeedRange.addEventListener('input', () => {
   animDuration = parseInt(animSpeedRange.value);
   animSpeedVal.textContent = animDuration;
 });
+
+// ── 進捗の復元（リロード/再訪時に続きから）──
+function redrawRevealed() {
+  const ctx = revealCanvas.getContext('2d');
+  ctx.clearRect(0, 0, dotCols, dotRows);
+  for (let n = 0; n < revealed; n++) {
+    const i = paintOrder[n];
+    if (i === undefined) break;
+    const p = pixelData[i];
+    const col = i % dotCols;
+    const row = Math.floor(i / dotCols);
+    ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${p.a/255})`;
+    ctx.fillRect(col, row, 1, 1);
+    eraseGridCell(col, row);
+  }
+  if (revealed > 0) {
+    modeSeq.disabled = true;
+    modeRnd.disabled = true;
+    modeSeq.title = modeRnd.title = '開始後は変更できません';
+  }
+}
+function restoreState() {
+  let imgRec = null, prog = null;
+  try { imgRec = JSON.parse(localStorage.getItem(IMG_KEY)); }  catch(e) {}
+  try { prog   = JSON.parse(localStorage.getItem(PROG_KEY)); } catch(e) {}
+  if (!imgRec || !imgRec.dataURL || !prog) return;
+  const img = new Image();
+  img.onload = () => {
+    uploadedImage = img;
+    currentImageDataURL = imgRec.dataURL;
+    fileName.textContent = imgRec.fileName || '';
+    document.getElementById('uploadArea').classList.add('hidden');
+    document.getElementById('mainTitle').style.display = 'block';
+    document.getElementById('mainLayout').classList.add('visible');
+    // 設定を復元
+    dotSizeSelect.value = prog.dotSizeValue;
+    randomMode = !!prog.randomMode;
+    modeSeq.classList.toggle('active', !randomMode);
+    modeRnd.classList.toggle('active',  randomMode);
+    paintSeed = prog.paintSeed >>> 0;
+    updateDotsPerSec(prog.dotsPerSec || 1);
+    updateTimerDots(prog.timerDots || 1);
+    countdownTotal = prog.countdownTotal || 0;
+    countdownLeft  = countdownTotal;
+    timerMinInput.value = Math.floor(countdownTotal / 60);
+    timerSecInput.value = countdownTotal % 60;
+    // 同じシードで塗り順を再構築
+    convert(true);
+    // 進捗を復元して描き直す
+    revealed = Math.min(prog.revealed || 0, totalPixels);
+    redrawRevealed();
+    accumulatedSec = prog.accumulatedSec || 0;
+    timerText.textContent = formatTime(accumulatedSec);
+    setCountdownDisplay(countdownTotal, '#e8c84a');
+    setInputMode(prog.inputMode || 'task');
+    if (revealed >= totalPixels && totalPixels > 0) {
+      isComplete = true;
+      demoBtn.disabled = true;
+    }
+    updateCounter();
+  };
+  img.src = imgRec.dataURL;
+}
+// 閉じる直前にも保存（取りこぼし防止）
+window.addEventListener('beforeunload', saveProgress);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveProgress(); });
+restoreState();
