@@ -570,7 +570,7 @@ function convert(isRestore = false) {
     paintOrder = order;
   }
   previewBtn.classList.remove('active');
-  previewBtn.textContent = '👁 完成形を見る';
+  previewBtn.textContent = '👁 完成形';
   const off = document.createElement('canvas');
   off.width = cols;
   off.height = rows;
@@ -803,7 +803,7 @@ previewBtn.addEventListener('click', () => {
   previewOn = !previewOn;
   ghostCanvas.classList.toggle('visible', previewOn);
   previewBtn.classList.toggle('active', previewOn);
-  previewBtn.textContent = previewOn ? '👁 プレビューを隠す' : '👁 完成形を見る';
+  previewBtn.textContent = previewOn ? '👁 隠す' : '👁 完成形';
 }
 );
 // ── 完成モーダル ──
@@ -853,7 +853,7 @@ midResetBtn.addEventListener('click', () => {
   isComplete = false;
   previewOn = false;
   previewBtn.classList.remove('active');
-  previewBtn.textContent = '👁 完成形を見る';
+  previewBtn.textContent = '👁 完成形';
   ghostCanvas.classList.remove('visible');
   revealCanvas.getContext('2d').clearRect(0, 0, dotCols, dotRows);
   gridCanvas.style.display = 'block';

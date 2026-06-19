@@ -70,7 +70,7 @@
 
   #sidePanel {
     display: flex; flex-direction: column; align-items: stretch;
-    gap: 1.3rem; min-width: 190px; width: 210px; flex-shrink: 0;
+    gap: 0.9rem; min-width: 190px; width: 210px; flex-shrink: 0;
     padding-top: 0.5rem;
   }
 
@@ -84,7 +84,7 @@
     cursor: pointer; width: 100%;
   }
 
-  #sidePanel #demoBtn { width: 100%; padding: 0.85rem 1rem; }
+  #sidePanel #demoBtn { width: 100%; padding: 0.65rem 1rem; }
   #sidePanel #previewBtn, #sidePanel #midResetBtn { width: 100%; }
 
   /* キャンバス層 */
@@ -118,13 +118,18 @@
   }
 
   #btnRow {
-    display: flex; flex-direction: column; gap: 0.75rem;
-    padding-top: 1rem; border-top: 1px solid #222;
-    margin-top: 0.3rem;
+    display: flex; flex-direction: column; gap: 0.5rem;
+    padding-top: 0.7rem; border-top: 1px solid #222;
+    margin-top: 0.2rem;
+  }
+  #subBtnRow { display: flex; gap: 0.5rem; }
+  #subBtnRow > button {
+    flex: 1; width: auto !important;
+    padding: 0.6rem 0.4rem !important; white-space: nowrap;
   }
 
   #demoBtn {
-    padding: 0.85rem 2.5rem; background: #4caf50; color: #fff;
+    padding: 0.6rem 2rem; background: #4caf50; color: #fff;
     border: none; font-size: 1rem; font-weight: bold;
     cursor: pointer; border-radius: 4px; transition: background 0.1s, transform 0.1s;
   }
@@ -368,6 +373,6 @@
 
     .mode-btn { padding: 0.55rem 0.45rem; font-size: 0.85rem; }
     .side-tab { padding: 0.65rem 0.2rem; font-size: 0.95rem; }
-    #demoBtn { padding: 1rem; font-size: 1.05rem; }
+    #demoBtn { padding: 0.7rem; font-size: 1.02rem; }
     #completeModal h2 { font-size: 1.3rem; }
   }
