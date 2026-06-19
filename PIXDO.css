@@ -21,6 +21,9 @@
   h1 { font-size: 2rem; color: #fff; font-weight: 900; letter-spacing: 8px; text-indent: 8px; }
 
   #fileInput { display: none; }
+  /* スマホ専用UI（PCでは非表示） */
+  #fab { display: none; }
+  #settingsClose { display: none; }
   #fileName { font-size: 0.75rem; color: #666; letter-spacing: 0.5px; word-break: break-all; }
 
   #uploadArea {
@@ -323,19 +326,48 @@
     user-select: none;
   }
 
-  /* ── レスポンシブ：狭い画面（スマホ）では縦積み ── */
+  /* ── レスポンシブ：スマホ（≤700px）── */
   @media (max-width: 700px) {
-    body { padding: 0.8rem 0 2.5rem; gap: 0.9rem; }
-    h1 { font-size: 1.4rem; letter-spacing: 5px; text-indent: 5px; }
-    #mainLayout.visible {
-      flex-direction: column; align-items: center;
-      gap: 1rem; padding: 0 0.6rem;
+    body { padding: 0.6rem 0 1rem; gap: 0.5rem; }
+    h1 { font-size: 1.3rem; letter-spacing: 4px; text-indent: 4px; }
+    #mainTitle { display: none; }
+    #mainLayout.visible { flex-direction: column; align-items: center; gap: 0.4rem; padding: 0 0.4rem; }
+    #mainLayout.visible.genzon { align-items: center; justify-content: center; }
+    #canvasArea { max-width: 100%; overflow: visible; }
+
+    /* 設定：全画面スライドインオーバーレイ */
+    #sidePanel {
+      position: fixed; inset: 0; z-index: 125;
+      width: 100%; max-width: none; min-width: 0;
+      background: #1a1a1a; overflow-y: auto;
+      padding: 1rem 1.2rem 3rem; gap: 1.1rem;
+      transform: translateY(100%);
+      transition: transform 0.28s ease;
     }
-    #mainLayout.visible.genzon { align-items: stretch; justify-content: flex-start; }
-    #sidePanel { width: 100%; min-width: 0; max-width: 440px; padding-top: 0; }
-    #canvasArea { max-width: 100%; }
-    .mode-btn { padding: 0.5rem 0.45rem; font-size: 0.82rem; }
-    .side-tab { padding: 0.6rem 0.2rem; font-size: 0.9rem; }
+    #sidePanel.open { transform: translateY(0); }
+    #settingsClose {
+      display: block; width: 100%; padding: 0.85rem;
+      background: #262626; color: #ccc; border: 1px solid #444;
+      border-radius: 8px; font-size: 1rem; cursor: pointer;
+    }
+
+    /* 移動可能な丸FAB */
+    #fab {
+      position: fixed; right: 18px; bottom: 18px; z-index: 130;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: #e8c84a; color: #111; border: none;
+      font-size: 1.6rem; cursor: pointer;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.55);
+      touch-action: none; user-select: none;
+      align-items: center; justify-content: center;
+    }
+    #fab.show { display: flex; }
+
+    /* キャンバス直接ペイント */
+    #revealCanvas { touch-action: none; }
+
+    .mode-btn { padding: 0.55rem 0.45rem; font-size: 0.85rem; }
+    .side-tab { padding: 0.65rem 0.2rem; font-size: 0.95rem; }
     #demoBtn { padding: 1rem; font-size: 1.05rem; }
     #completeModal h2 { font-size: 1.3rem; }
   }

@@ -457,6 +457,7 @@ function loadFile(f) {
       document.getElementById('mainLayout').classList.add('visible');
       convert();
       saveImage();
+      document.getElementById('fab').classList.add('show');
     };
     img.src = ev.target.result;
   };
@@ -507,18 +508,29 @@ function convert(isRestore = false) {
   }
   else {
     mainLayout.classList.remove('genzon');
-    const MAX_DISP = Math.min(window.innerWidth - 48, 720);
-    const longer = Math.max(imgW, imgH);
-    let dotsLong = Math.max(1, Math.round(longer / dotPx));
-    if (dotsLong * dotPx > MAX_DISP) dotsLong = Math.floor(MAX_DISP / dotPx);
     const ratio = imgH / imgW;
-    if (imgW >= imgH) {
-      cols = dotsLong;
-      rows = Math.max(1, Math.round(cols * ratio));
-    }
-    else {
-      rows = dotsLong;
-      cols = Math.max(1, Math.round(rows / ratio));
+    if (window.innerWidth <= 700) {
+      // スマホ：画面に画像全体を収める（contain）
+      const availW = window.innerWidth - 12;
+      const availH = window.innerHeight - 110;
+      let c = Math.max(1, Math.floor(availW / dotPx));
+      let r = Math.max(1, Math.round(c * ratio));
+      const maxR = Math.max(1, Math.floor(availH / dotPx));
+      if (r > maxR) { r = maxR; c = Math.max(1, Math.round(r / ratio)); }
+      cols = c; rows = r;
+    } else {
+      const MAX_DISP = Math.min(window.innerWidth - 48, 720);
+      const longer = Math.max(imgW, imgH);
+      let dotsLong = Math.max(1, Math.round(longer / dotPx));
+      if (dotsLong * dotPx > MAX_DISP) dotsLong = Math.floor(MAX_DISP / dotPx);
+      if (imgW >= imgH) {
+        cols = dotsLong;
+        rows = Math.max(1, Math.round(cols * ratio));
+      }
+      else {
+        rows = dotsLong;
+        cols = Math.max(1, Math.round(rows / ratio));
+      }
     }
   }
   dotCols = cols;
@@ -885,24 +897,55 @@ completeCanvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 let isDragging = false, dragStartX, dragStartY;
+const cPts = new Map();
+let cPinchDist = 0, cPinchScale = 1;
 completeCanvas.addEventListener('pointerdown', (e) => {
   if (!completeFromCanvas) return;
-  isDragging = true;
-  dragStartX = e.clientX - canvasX;
-  dragStartY = e.clientY - canvasY;
-  completeCanvas.setPointerCapture(e.pointerId);
-  completeCanvas.style.cursor = 'grabbing';  e.preventDefault();
+  e.preventDefault();
+  cPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (cPts.size === 1) {
+    isDragging = true;
+    dragStartX = e.clientX - canvasX;
+    dragStartY = e.clientY - canvasY;
+    completeCanvas.style.cursor = 'grabbing';
+  } else if (cPts.size === 2) {
+    isDragging = false;
+    const p = [...cPts.values()];
+    cPinchDist = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    cPinchScale = completeScale;
+  }
 });
 completeCanvas.addEventListener('pointermove', (e) => {
-  if (!isDragging) return;
-  canvasX = e.clientX - dragStartX;
-  canvasY = e.clientY - dragStartY;
-  applyCompleteTransform();
+  if (!completeFromCanvas || !cPts.has(e.pointerId)) return;
+  cPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (cPts.size >= 2) {
+    const p = [...cPts.values()];
+    const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    if (cPinchDist > 0) {
+      completeScale = Math.min(8, Math.max(0.1, cPinchScale * (d / cPinchDist)));
+      applyCompleteTransform();
+    }
+  } else if (isDragging) {
+    canvasX = e.clientX - dragStartX;
+    canvasY = e.clientY - dragStartY;
+    applyCompleteTransform();
+  }
 });
-completeCanvas.addEventListener('pointerup', () => {
-  isDragging = false;
-  completeCanvas.style.cursor = completeFromCanvas ? 'zoom-in' : 'default';
-});
+function completePtrEnd(e) {
+  cPts.delete(e.pointerId);
+  if (cPts.size < 2) cPinchDist = 0;
+  if (cPts.size === 1) {
+    const rem = [...cPts.values()][0];
+    isDragging = true;
+    dragStartX = rem.x - canvasX;
+    dragStartY = rem.y - canvasY;
+  } else if (cPts.size === 0) {
+    isDragging = false;
+    completeCanvas.style.cursor = completeFromCanvas ? 'zoom-in' : 'default';
+  }
+}
+completeCanvas.addEventListener('pointerup', completePtrEnd);
+completeCanvas.addEventListener('pointercancel', completePtrEnd);
 
 // completeCanvasクリックで閉じる（completeモード時のみ）
 completeCanvas.addEventListener('click', () => {
@@ -917,6 +960,23 @@ completeModal.addEventListener('click', (e) => {
 // メインキャンバスクリックでcomplete後に再表示
 revealCanvas.addEventListener('click', () => {
   if (isComplete) showComplete(true);
+});
+
+// キャンバスを直接ペイント（タップ=1ドット / 長押し=加速。手動モードのみ）
+revealCanvas.addEventListener('pointerdown', (e) => {
+  if (isComplete || isTimeMode || isTimerMode) return;
+  e.preventDefault();
+  try { revealCanvas.setPointerCapture(e.pointerId); } catch(_) {}
+  holdTick = 0;
+  paintDots(1);
+  demoBtnTimer = setTimeout(() => { scheduleNext(); }, 350);
+});
+revealCanvas.addEventListener('pointerup', () => {
+  if (!isComplete && !isTimeMode && !isTimerMode) { stopHold(); saveProgress(); }
+});
+revealCanvas.addEventListener('pointercancel', () => stopHold());
+revealCanvas.addEventListener('pointerleave', () => {
+  if (!isComplete && !isTimeMode && !isTimerMode) stopHold();
 });
 
 
@@ -1115,6 +1175,38 @@ document.querySelectorAll('.side-tab').forEach(tab => {
   });
 });
 
+// ── スマホ: FAB（移動可能）+ 全画面設定オーバーレイ ──
+(function setupFab() {
+  const fab = document.getElementById('fab');
+  const panel = document.getElementById('sidePanel');
+  const closeBtn = document.getElementById('settingsClose');
+  if (!fab || !panel) return;
+  let dragging = false, moved = false, sx = 0, sy = 0, offX = 0, offY = 0;
+  fab.addEventListener('pointerdown', (e) => {
+    dragging = true; moved = false;
+    try { fab.setPointerCapture(e.pointerId); } catch(_) {}
+    const r = fab.getBoundingClientRect();
+    offX = e.clientX - r.left; offY = e.clientY - r.top;
+    sx = e.clientX; sy = e.clientY;
+  });
+  fab.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 8) moved = true;
+    if (moved) {
+      const x = Math.max(4, Math.min(window.innerWidth - 60, e.clientX - offX));
+      const y = Math.max(4, Math.min(window.innerHeight - 60, e.clientY - offY));
+      fab.style.left = x + 'px'; fab.style.top = y + 'px';
+      fab.style.right = 'auto'; fab.style.bottom = 'auto';
+    }
+  });
+  fab.addEventListener('pointerup', () => {
+    dragging = false;
+    if (!moved) panel.classList.toggle('open');
+  });
+  fab.addEventListener('pointercancel', () => { dragging = false; });
+  if (closeBtn) closeBtn.addEventListener('click', () => panel.classList.remove('open'));
+})();
+
 // ── アニメーション設定UI ──
 document.getElementById('animEnabled').addEventListener('change', e => {
   animEnabled = e.target.checked;
@@ -1182,6 +1274,7 @@ function restoreState() {
     document.getElementById('uploadArea').classList.add('hidden');
     document.getElementById('mainTitle').style.display = 'block';
     document.getElementById('mainLayout').classList.add('visible');
+    document.getElementById('fab').classList.add('show');
     // 設定を復元
     dotSizeSelect.value = prog.dotSizeValue;
     randomMode = !!prog.randomMode;
