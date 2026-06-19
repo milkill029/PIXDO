@@ -312,3 +312,30 @@
     from { opacity: 0; transform: translateY(-6px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+
+  /* ── タッチ操作（スマホ）対応 ── */
+  /* 長押しでスクロール・テキスト選択・長押しメニューが誤爆しないように */
+  #demoBtn { touch-action: none; }
+  #demoBtn, #revealCanvas, #completeCanvas, .mode-btn, .quick-btn,
+  .side-tab, #dropZoneSmall, .anim-freq-btn, .anim-dir-btn {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* ── レスポンシブ：狭い画面（スマホ）では縦積み ── */
+  @media (max-width: 700px) {
+    body { padding: 0.8rem 0 2.5rem; gap: 0.9rem; }
+    h1 { font-size: 1.4rem; letter-spacing: 5px; text-indent: 5px; }
+    #mainLayout.visible {
+      flex-direction: column; align-items: center;
+      gap: 1rem; padding: 0 0.6rem;
+    }
+    #mainLayout.visible.genzon { align-items: stretch; justify-content: flex-start; }
+    #sidePanel { width: 100%; min-width: 0; max-width: 440px; padding-top: 0; }
+    #canvasArea { max-width: 100%; }
+    .mode-btn { padding: 0.5rem 0.45rem; font-size: 0.82rem; }
+    .side-tab { padding: 0.6rem 0.2rem; font-size: 0.9rem; }
+    #demoBtn { padding: 1rem; font-size: 1.05rem; }
+    #completeModal h2 { font-size: 1.3rem; }
+  }

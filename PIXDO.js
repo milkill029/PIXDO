@@ -781,6 +781,11 @@ demoBtn.addEventListener('pointercancel',() => {
   if (!isTimeMode && !isTimerMode) stopHold();
 }
 );
+// スマホ：長押し時のコンテキストメニュー（テキスト選択メニュー）を抑止
+[demoBtn, revealCanvas, completeCanvas].forEach(el => {
+  if (el) el.addEventListener('contextmenu', e => e.preventDefault());
+}
+);
 // ── プレビュー ──
 previewBtn.addEventListener('click', () => {
   previewOn = !previewOn;
